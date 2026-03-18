@@ -10,10 +10,12 @@ using ReleasePilot.Application.Ports;
 
 namespace ReleasePilot.Infrastructure.Persistence
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IApplicationDbContext
     {
         public DbSet<Promotion> Promotions => Set<Promotion>();
-        
+
+        IQueryable<Promotion> IApplicationDbContext.Promotions => Promotions;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

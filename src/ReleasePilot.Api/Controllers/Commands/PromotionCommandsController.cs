@@ -20,7 +20,11 @@ public class PromotionCommandsController(ISender sender) : ControllerBase
     {
         var promotionId = await sender.Send(command, cancellationToken);
 
-        return Created($"/api/promotions/{promotionId}", new { id = promotionId });
+        return CreatedAtAction(
+            actionName: "GetPromotionById",
+            controllerName: "PromotionQueries",
+            routeValues: new { id = promotionId },
+            value: new { id = promotionId });
     }
 
     [HttpPut("{id:guid}/approve")]

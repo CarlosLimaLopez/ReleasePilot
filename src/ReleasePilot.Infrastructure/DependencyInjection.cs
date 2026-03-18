@@ -26,6 +26,9 @@ public static class DependencyInjection
                 .UseNpgsql(connectionString)
                 .AddInterceptors(sp.GetRequiredService<PublishDomainEventsInterceptor>()));
 
+        services.AddScoped<IApplicationDbContext>(sp =>
+            sp.GetRequiredService<ApplicationDbContext>());
+
         services.AddScoped<IPromotionRepository, PromotionRepository>();
 
         // Domain service policies
@@ -34,6 +37,7 @@ public static class DependencyInjection
 
         // External system ports (stubs)
         services.AddScoped<IDeploymentPort, StubDeploymentPort>();
+        services.AddScoped<IIssueTrackerPort, StubIssueTrackerPort>();
 
         services.AddMassTransit(x =>
         {
