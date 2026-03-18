@@ -12,13 +12,14 @@ public class PromotionTests
     private const string DefaultAppId = "app-1";
     private const string DefaultVersion = "1.0.0";
     private const string DefaultUser = "user-approver";
+    private const string DefaultRequester = "user-requester";
 
     #region Request
 
     [Fact]
     public void Request_WithValidParameters_CreatesPromotionInRequestedState()
     {
-        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging);
+        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging, DefaultRequester);
 
         Assert.NotEqual(Guid.Empty, promotion.Id);
         Assert.Equal(DefaultAppId, promotion.ApplicationId);
@@ -27,14 +28,14 @@ public class PromotionTests
         Assert.Equal(DeploymentEnvironment.Staging, promotion.TargetEnvironment);
         Assert.Equal(PromotionState.Requested, promotion.State);
         Assert.Null(promotion.RollbackReason);
-    }
+    }                                                                                                                       
 
     [Fact]
     public void Request_WithWorkItems_IncludesWorkItemReferences()
     {
         var workItems = new[] { WorkItemReference.Create("WI-1"), WorkItemReference.Create("WI-2") };
 
-        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging, workItems);
+        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging, DefaultRequester, workItems);
 
         Assert.Equal(2, promotion.WorkItemReferences.Count);
     }
@@ -42,7 +43,7 @@ public class PromotionTests
     [Fact]
     public void Request_WithoutWorkItems_HasEmptyWorkItemReferences()
     {
-        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging);
+        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging, DefaultRequester);
 
         Assert.Empty(promotion.WorkItemReferences);
     }
@@ -50,32 +51,33 @@ public class PromotionTests
     [Fact]
     public void Request_RaisesPromotionRequestedEvent()
     {
-        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging);
+        var promotion = Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging, DefaultRequester);
 
         var domainEvent = Assert.Single(promotion.DomainEvents);
         var requested = Assert.IsType<PromotionRequested>(domainEvent);
         Assert.Equal(promotion.Id, requested.PromotionId);
+        Assert.Equal(DefaultRequester, requested.ActingUser);
     }
 
     [Fact]
     public void Request_SameSourceAndTarget_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Dev));
+            Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Dev, DefaultRequester));
     }
 
     [Fact]
     public void Request_TargetIsDev_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Staging, DeploymentEnvironment.Dev));
+            Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Staging, DeploymentEnvironment.Dev, DefaultRequester));
     }
 
     [Fact]
     public void Request_SkipsEnvironment_ThrowsDomainException()
     {
         Assert.Throws<DomainException>(() =>
-            Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Production));
+            Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Production, DefaultRequester));
     }
 
     [Theory]
@@ -84,7 +86,7 @@ public class PromotionTests
     public void Request_ReverseProgression_ThrowsDomainException(DeploymentEnvironment source, DeploymentEnvironment target)
     {
         Assert.Throws<DomainException>(() =>
-            Promotion.Request(DefaultAppId, DefaultVersion, source, target));
+            Promotion.Request(DefaultAppId, DefaultVersion, source, target, DefaultRequester));
     }
 
     #endregion
@@ -108,7 +110,8 @@ public class PromotionTests
 
         promotion.Approve(DefaultUser, new StubAuthorizationPolicy(true), new StubConcurrencyPolicy(false));
 
-        Assert.Contains(promotion.DomainEvents, e => e is PromotionApproved);
+        var evt = promotion.DomainEvents.OfType<PromotionApproved>().Single();
+        Assert.Equal(DefaultUser, evt.ActingUser);
     }
 
     [Fact]
@@ -165,7 +168,7 @@ public class PromotionTests
     {
         var promotion = CreateApprovedPromotion();
 
-        promotion.StartDeployment();
+        promotion.StartDeployment(DefaultUser);
 
         Assert.Equal(PromotionState.InProgress, promotion.State);
     }
@@ -175,9 +178,10 @@ public class PromotionTests
     {
         var promotion = CreateApprovedPromotion();
 
-        promotion.StartDeployment();
+        promotion.StartDeployment(DefaultUser);
 
-        Assert.Contains(promotion.DomainEvents, e => e is DeploymentStarted);
+        var evt = promotion.DomainEvents.OfType<DeploymentStarted>().Single();
+        Assert.Equal(DefaultUser, evt.ActingUser);
     }
 
     [Fact]
@@ -185,7 +189,7 @@ public class PromotionTests
     {
         var promotion = CreateRequestedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.StartDeployment());
+        Assert.Throws<DomainException>(() => promotion.StartDeployment(DefaultUser));
     }
 
     [Fact]
@@ -193,7 +197,7 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.StartDeployment());
+        Assert.Throws<DomainException>(() => promotion.StartDeployment(DefaultUser));
     }
 
     #endregion
@@ -205,7 +209,7 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        promotion.Complete();
+        promotion.Complete(DefaultUser);
 
         Assert.Equal(PromotionState.Completed, promotion.State);
     }
@@ -215,9 +219,10 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        promotion.Complete();
+        promotion.Complete(DefaultUser);
 
-        Assert.Contains(promotion.DomainEvents, e => e is PromotionCompleted);
+        var evt = promotion.DomainEvents.OfType<PromotionCompleted>().Single();
+        Assert.Equal(DefaultUser, evt.ActingUser);
     }
 
     [Fact]
@@ -226,7 +231,7 @@ public class PromotionTests
         var promotion = CreateInProgressPromotion();
         var before = DateTimeOffset.UtcNow;
 
-        promotion.Complete();
+        promotion.Complete(DefaultUser);
 
         var after = DateTimeOffset.UtcNow;
         Assert.NotNull(promotion.CompletedAtUtc);
@@ -246,7 +251,7 @@ public class PromotionTests
     {
         var promotion = CreateRequestedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Complete());
+        Assert.Throws<DomainException>(() => promotion.Complete(DefaultUser));
     }
 
     [Fact]
@@ -254,7 +259,7 @@ public class PromotionTests
     {
         var promotion = CreateApprovedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Complete());
+        Assert.Throws<DomainException>(() => promotion.Complete(DefaultUser));
     }
 
     #endregion
@@ -266,7 +271,7 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        promotion.Rollback("Critical bug found");
+        promotion.Rollback("Critical bug found", DefaultUser);
 
         Assert.Equal(PromotionState.RolledBack, promotion.State);
         Assert.Equal("Critical bug found", promotion.RollbackReason);
@@ -277,10 +282,11 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        promotion.Rollback("Reason");
+        promotion.Rollback("Reason", DefaultUser);
 
         var evt = promotion.DomainEvents.OfType<PromotionRolledBack>().Single();
         Assert.Equal("Reason", evt.Reason);
+        Assert.Equal(DefaultUser, evt.ActingUser);
     }
 
     [Fact]
@@ -288,7 +294,7 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Rollback(""));
+        Assert.Throws<DomainException>(() => promotion.Rollback("", DefaultUser));
     }
 
     [Fact]
@@ -296,7 +302,7 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Rollback("   "));
+        Assert.Throws<DomainException>(() => promotion.Rollback("   ", DefaultUser));
     }
 
     [Fact]
@@ -304,7 +310,7 @@ public class PromotionTests
     {
         var promotion = CreateRequestedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Rollback("Reason"));
+        Assert.Throws<DomainException>(() => promotion.Rollback("Reason", DefaultUser));
     }
 
     [Fact]
@@ -312,7 +318,7 @@ public class PromotionTests
     {
         var promotion = CreateCompletedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Rollback("Reason"));
+        Assert.Throws<DomainException>(() => promotion.Rollback("Reason", DefaultUser));
     }
 
     #endregion
@@ -324,7 +330,7 @@ public class PromotionTests
     {
         var promotion = CreateRequestedPromotion();
 
-        promotion.Cancel();
+        promotion.Cancel(DefaultRequester);
 
         Assert.Equal(PromotionState.Cancelled, promotion.State);
     }
@@ -334,9 +340,10 @@ public class PromotionTests
     {
         var promotion = CreateRequestedPromotion();
 
-        promotion.Cancel();
+        promotion.Cancel(DefaultRequester);
 
-        Assert.Contains(promotion.DomainEvents, e => e is PromotionCancelled);
+        var evt = promotion.DomainEvents.OfType<PromotionCancelled>().Single();
+        Assert.Equal(DefaultRequester, evt.ActingUser);
     }
 
     [Fact]
@@ -344,7 +351,7 @@ public class PromotionTests
     {
         var promotion = CreateApprovedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Cancel());
+        Assert.Throws<DomainException>(() => promotion.Cancel(DefaultRequester));
     }
 
     [Fact]
@@ -352,7 +359,7 @@ public class PromotionTests
     {
         var promotion = CreateInProgressPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Cancel());
+        Assert.Throws<DomainException>(() => promotion.Cancel(DefaultRequester));
     }
 
     [Fact]
@@ -360,7 +367,7 @@ public class PromotionTests
     {
         var promotion = CreateCompletedPromotion();
 
-        Assert.Throws<DomainException>(() => promotion.Cancel());
+        Assert.Throws<DomainException>(() => promotion.Cancel(DefaultRequester));
     }
 
     #endregion
@@ -368,7 +375,7 @@ public class PromotionTests
     #region Helpers
 
     private static Promotion CreateRequestedPromotion()
-        => Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging);
+        => Promotion.Request(DefaultAppId, DefaultVersion, DeploymentEnvironment.Dev, DeploymentEnvironment.Staging, DefaultRequester);
 
     private static Promotion CreateApprovedPromotion()
     {
@@ -380,21 +387,21 @@ public class PromotionTests
     private static Promotion CreateInProgressPromotion()
     {
         var promotion = CreateApprovedPromotion();
-        promotion.StartDeployment();
+        promotion.StartDeployment(DefaultUser);
         return promotion;
     }
 
     private static Promotion CreateCompletedPromotion()
     {
         var promotion = CreateInProgressPromotion();
-        promotion.Complete();
+        promotion.Complete(DefaultUser);
         return promotion;
     }
 
     private static Promotion CreateCancelledPromotion()
     {
         var promotion = CreateRequestedPromotion();
-        promotion.Cancel();
+        promotion.Cancel(DefaultRequester);
         return promotion;
     }
 
