@@ -24,6 +24,7 @@ namespace ReleasePilot.Domain.Aggregates
         public DeploymentEnvironment TargetEnvironment { get; private set; }
         public PromotionState State { get; private set; }
         public string? RollbackReason { get; private set; }
+        public DateTimeOffset? CompletedAtUtc { get; private set; }
         
         public IReadOnlyCollection<WorkItemReference> WorkItemReferences => _workItemReferences.AsReadOnly();
 
@@ -97,6 +98,7 @@ namespace ReleasePilot.Domain.Aggregates
                 throw new DomainException($"Cannot complete promotion from state: {State}. Must be InProgress.");
 
             State = PromotionState.Completed;
+            CompletedAtUtc = DateTimeOffset.UtcNow;
             AddDomainEvent(new PromotionCompleted(Id));
         }
 

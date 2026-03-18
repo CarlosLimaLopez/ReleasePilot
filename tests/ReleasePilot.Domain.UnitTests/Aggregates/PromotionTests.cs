@@ -221,6 +221,27 @@ public class PromotionTests
     }
 
     [Fact]
+    public void Complete_WhenInProgress_SetsCompletedAtUtc()
+    {
+        var promotion = CreateInProgressPromotion();
+        var before = DateTimeOffset.UtcNow;
+
+        promotion.Complete();
+
+        var after = DateTimeOffset.UtcNow;
+        Assert.NotNull(promotion.CompletedAtUtc);
+        Assert.InRange(promotion.CompletedAtUtc.Value, before, after);
+    }
+
+    [Fact]
+    public void Request_CompletedAtUtc_IsNull()
+    {
+        var promotion = CreateRequestedPromotion();
+
+        Assert.Null(promotion.CompletedAtUtc);
+    }
+
+    [Fact]
     public void Complete_WhenRequested_ThrowsDomainException()
     {
         var promotion = CreateRequestedPromotion();
