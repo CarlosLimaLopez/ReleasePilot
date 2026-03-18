@@ -7,6 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+  	<PackageReference Include="MassTransit" Version="8.2.5" />
+  	<PackageReference Include="MassTransit.RabbitMQ" Version="8.2.5" />
+  	<PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.2.5" />
+  	<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+  </ItemGroup>
+	
+  <ItemGroup>
     <ProjectReference Include="..\ReleasePilot.Application\ReleasePilot.Application.csproj" />
   </ItemGroup>
 
