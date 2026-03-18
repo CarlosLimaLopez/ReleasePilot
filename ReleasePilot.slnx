@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Elementos de la solución/">
+    <File Path="docker-compose.yaml" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ReleasePilot.Domain.UnitTests/ReleasePilot.Domain.UnitTests.csproj" Id="c4c7f382-ea9c-4eea-aa1e-fb87225150f6" />
   </Folder>
