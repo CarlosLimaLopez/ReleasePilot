@@ -12,7 +12,7 @@ namespace ReleasePilot.Application.Commands.CompletePromotion
             var promotion = await repository.GetByIdAsync(request.PromotionId, cancellationToken)
                 ?? throw new ApplicationException($"Promotion {request.PromotionId} not found.");
 
-            promotion.Complete(); 
+            promotion.Complete(request.ActingUser); 
 
             await repository.UpdateAsync(promotion, cancellationToken);
         }

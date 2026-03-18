@@ -19,6 +19,7 @@ namespace ReleasePilot.Application.Commands.RequestPromotion
                 request.Version,
                 request.SourceEnvironment,
                 request.TargetEnvironment,
+                request.ActingUser,
                 workItems);
 
             await repository.AddAsync(promotion, cancellationToken);

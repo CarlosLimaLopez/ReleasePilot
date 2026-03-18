@@ -6,6 +6,7 @@ using ReleasePilot.Application.Ports;
 using ReleasePilot.Domain.Repositories;
 using ReleasePilot.Domain.Services;
 using ReleasePilot.Infrastructure.Adapters;
+using ReleasePilot.Infrastructure.EventConsumers;
 using ReleasePilot.Infrastructure.Persistence;
 using ReleasePilot.Infrastructure.Persistence.Interceptors;
 using ReleasePilot.Infrastructure.Persistence.Repositories;
@@ -36,11 +37,15 @@ public static class DependencyInjection
         services.AddScoped<IPromotionConcurrencyPolicy, PromotionConcurrencyPolicy>();
 
         // External system ports (stubs)
+        services.AddScoped<INotificationPort, StubNotificationPort>();
         services.AddScoped<IDeploymentPort, StubDeploymentPort>();
         services.AddScoped<IIssueTrackerPort, StubIssueTrackerPort>();
 
         services.AddMassTransit(x =>
         {
+            x.AddConsumer<AuditLogConsumer>();
+            x.AddConsumer<NotificationConsumer>();
+
             x.UsingRabbitMq((context, cfg) =>
             {
                 var host = configuration["RabbitMq:Host"] ?? "localhost";

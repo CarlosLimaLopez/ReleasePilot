@@ -12,7 +12,7 @@ namespace ReleasePilot.Application.Commands.RollbackPromotion
             var promotion = await repository.GetByIdAsync(request.PromotionId, cancellationToken)
                 ?? throw new ApplicationException($"Promotion {request.PromotionId} not found.");
 
-            promotion.Rollback(request.Reason);
+            promotion.Rollback(request.Reason, request.ActingUser);
 
             await repository.UpdateAsync(promotion, cancellationToken);
         }

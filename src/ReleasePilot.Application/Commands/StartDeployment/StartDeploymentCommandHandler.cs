@@ -14,7 +14,7 @@ namespace ReleasePilot.Application.Commands.StartDeployment
             var promotion = await repository.GetByIdAsync(request.PromotionId, cancellationToken)
                 ?? throw new ApplicationException($"Promotion {request.PromotionId} not found.");
 
-            promotion.StartDeployment();
+            promotion.StartDeployment(request.ActingUser);
 
             await deploymentPort.TriggerDeploymentAsync(promotion, cancellationToken);
 

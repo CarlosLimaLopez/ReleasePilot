@@ -10,5 +10,6 @@ namespace ReleasePilot.Application.Commands.RequestPromotion
         string Version, 
         DeploymentEnvironment TargetEnvironment,
         DeploymentEnvironment SourceEnvironment,
+        string ActingUser,
         IEnumerable<WorkItemDto>? WorkItems) : IRequest<Guid>;
 }

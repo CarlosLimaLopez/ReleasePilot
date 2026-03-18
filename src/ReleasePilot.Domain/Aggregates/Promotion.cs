@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using ReleasePilot.Domain.Enums;
 using ReleasePilot.Domain.Events;
 using ReleasePilot.Domain.Exceptions;
@@ -8,10 +11,10 @@ namespace ReleasePilot.Domain.Aggregates
 {
     public class Promotion : AggregateRoot
     {
-        private static readonly DeploymentEnvironment[] EnvironmentProgression = 
+        private static readonly DeploymentEnvironment[] EnvironmentProgression =
         [
-            DeploymentEnvironment.Dev, 
-            DeploymentEnvironment.Staging, 
+            DeploymentEnvironment.Dev,
+            DeploymentEnvironment.Staging,
             DeploymentEnvironment.Production
         ];
 
@@ -19,23 +22,24 @@ namespace ReleasePilot.Domain.Aggregates
 
         public Guid Id { get; private set; }
         public string ApplicationId { get; private set; } = string.Empty;
-        public ApplicationVersion Version { get; private set; } = default!;        
+        public ApplicationVersion Version { get; private set; } = default!;
         public DeploymentEnvironment SourceEnvironment { get; private set; }
         public DeploymentEnvironment TargetEnvironment { get; private set; }
         public PromotionState State { get; private set; }
         public string? RollbackReason { get; private set; }
         public DateTimeOffset CreatedAt { get; private set; }
         public DateTimeOffset? CompletedAtUtc { get; private set; }
-        
+
         public IReadOnlyCollection<WorkItemReference> WorkItemReferences => _workItemReferences.AsReadOnly();
 
         private Promotion() { }
 
         public static Promotion Request(
-            string applicationId, 
-            string version, 
-            DeploymentEnvironment sourceEnvironment, 
+            string applicationId,
+            string version,
+            DeploymentEnvironment sourceEnvironment,
             DeploymentEnvironment targetEnvironment,
+            string actingUser,
             IEnumerable<WorkItemReference>? workItems = null)
         {
             EnsureValidEnvironmentProgression(sourceEnvironment, targetEnvironment);
@@ -55,8 +59,8 @@ namespace ReleasePilot.Domain.Aggregates
 
             if (workItems != null)
                 promotion._workItemReferences.AddRange(workItems);
-            
-            promotion.AddDomainEvent(new PromotionRequested(promotion.Id));
+
+            promotion.AddDomainEvent(new PromotionRequested(promotion.Id, actingUser));
 
             return promotion;
         }
@@ -78,10 +82,10 @@ namespace ReleasePilot.Domain.Aggregates
                 throw new DomainException("Another promotion is already InProgress for this application and environment.");
 
             State = PromotionState.Approved;
-            AddDomainEvent(new PromotionApproved(Id));
+            AddDomainEvent(new PromotionApproved(Id, actingUser));
         }
 
-        public void StartDeployment()
+        public void StartDeployment(string actingUser)
         {
             EnsureMutable();
 
@@ -89,10 +93,10 @@ namespace ReleasePilot.Domain.Aggregates
                 throw new DomainException($"Cannot start deployment from state: {State}. Must be Approved.");
 
             State = PromotionState.InProgress;
-            AddDomainEvent(new DeploymentStarted(Id));
+            AddDomainEvent(new DeploymentStarted(Id, actingUser));
         }
 
-        public void Complete()
+        public void Complete(string actingUser)
         {
             EnsureMutable();
 
@@ -101,10 +105,10 @@ namespace ReleasePilot.Domain.Aggregates
 
             State = PromotionState.Completed;
             CompletedAtUtc = DateTimeOffset.UtcNow;
-            AddDomainEvent(new PromotionCompleted(Id));
+            AddDomainEvent(new PromotionCompleted(Id, actingUser));
         }
 
-        public void Rollback(string reason)
+        public void Rollback(string reason, string actingUser)
         {
             EnsureMutable();
 
@@ -116,10 +120,10 @@ namespace ReleasePilot.Domain.Aggregates
 
             State = PromotionState.RolledBack;
             RollbackReason = reason;
-            AddDomainEvent(new PromotionRolledBack(Id, reason));
+            AddDomainEvent(new PromotionRolledBack(Id, reason, actingUser));
         }
 
-        public void Cancel()
+        public void Cancel(string actingUser)
         {
             EnsureMutable();
 
@@ -127,7 +131,7 @@ namespace ReleasePilot.Domain.Aggregates
                 throw new DomainException($"Cannot cancel promotion from state: {State}. It can only be cancelled from Requested state.");
 
             State = PromotionState.Cancelled;
-            AddDomainEvent(new PromotionCancelled(Id));
+            AddDomainEvent(new PromotionCancelled(Id, actingUser));
         }
 
         private void EnsureMutable()
@@ -143,7 +147,7 @@ namespace ReleasePilot.Domain.Aggregates
 
             if (targetIndex == -1)
                 throw new DomainException($"Invalid target environment: {target}");
-            
+
             if (sourceIndex == -1)
                 throw new DomainException($"Invalid source environment: {source}");
 

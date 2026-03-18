@@ -10,11 +10,14 @@ using ReleasePilot.Application.Ports;
 
 namespace ReleasePilot.Infrastructure.Persistence
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IApplicationDbContext
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : DbContext(options), IApplicationDbContext
     {
         public DbSet<Promotion> Promotions => Set<Promotion>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         IQueryable<Promotion> IApplicationDbContext.Promotions => Promotions;
+        IQueryable<AuditLog> IApplicationDbContext.AuditLogs => AuditLogs;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,7 +37,7 @@ namespace ReleasePilot.Infrastructure.Persistence
 
                 entity.Property(p => p.Version)
                       .HasConversion(
-                          v => v.Value,            
+                          v => v.Value,
                           v => ApplicationVersion.Create(v)
                       )
                       .IsRequired();
@@ -52,6 +55,15 @@ namespace ReleasePilot.Infrastructure.Persistence
                       )
                       .HasColumnType("jsonb")
                       .Metadata.SetValueComparer(workItemComparer);
+            });
+
+            modelBuilder.Entity<AuditLog>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.EventType).IsRequired();
+                entity.Property(a => a.ActingUser).IsRequired();
+                entity.Property(a => a.PromotionId).IsRequired();
+                entity.Property(a => a.Timestamp).IsRequired();
             });
         }
     }
